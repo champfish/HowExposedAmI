@@ -1,4 +1,4 @@
-const key = '7RW7EEYD8GAPT3GZ';
+const key = 'INSERTKEYHERE';
 const port = 80;
 const format = "YYYY-MM-DD";
 const staticPath = '/web/';
