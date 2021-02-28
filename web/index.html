@@ -29,18 +29,37 @@
 		</div>
 		<div class="col-lg" align="center" id="cent">
 			<h1>How Exposed am I?</h1>
+			<i>Enter in your positon or potential changes to your postion to see how the relations between investments creates risk</i>
+			<br>
+			<br>
 			<div class="input-group" id="stocks0">
 				<input type="text" aria-label="Ticker" placeholder="Ticker" class="form-control" id="tick0">
 				<input type="number" aria-label="Quantity" placeholder="Quantity" class="form-control" id="quant0">
 				<span class="input-group-text" id="cost0">Cost</span>
 				<span class="input-group-text" id="value0">Value</span>
 			</div>
-			<div align="center">
-  <button type="button" class="btn btn-danger hell" onclick="window.location.reload(true)" aria-haspopup="true" aria-expanded="false" style="width:50%">Clear
-  </button>
-  <button type="button" class="btn btn-primary" onclick="" aria-haspopup="true" aria-expanded="false" style="width:50%">Calculate
-  </button>
-</div>
+			<br>	
+
+			<div class="d-flex justify-content-between">
+				<div>
+					<label for="customRange2" class="form-label"   style="font-weight: bold; color:red;" id="rangeLab">-1% Change</label>
+				</div>
+				<div>
+					<button type="button" class="btn btn-info" id="cap" style="font-weight: bold;">Total Value: </button>
+				</div>
+			</div>		
+
+			<div class="input-group" id="range">
+				<input type="range" class="form-range" min="-10" max="10" value="-1" id="customRange2">
+			</div>
+			<br>
+
+			<div align="center" id="buttDiv">
+				<button type="button" class="btn btn-danger hell" onclick="window.location.reload(true)" aria-haspopup="true" aria-expanded="false" style="width:50%">Clear
+				</button>
+				<button type="button" class="btn btn-primary" aria-haspopup="true" aria-expanded="false" id="calc" style="width:50%">Calculate
+				</button>
+			</div>
 
 
 		</div>
@@ -51,8 +70,22 @@
 
 		<script src="web.js"></script>
 		<script type="text/javascript">
+			var range = -1;
 			var stockCount = 0;
 			var socket = io();
+			values=[];
+			var total = 0;
+			var stocks = {};
+			var stocksPrice = {};
+
+			
+			$("#customRange2").on("change",function(){
+				var val = parseInt($("#customRange2").val());
+				range = val;
+				$("#rangeLab").text(val+"% Change");
+				$("#rangeLab").css("color",getColor(val));
+
+			});
 
 			$("#cent").on("focus","input",function(){
 				var elm = $(this);
@@ -69,7 +102,6 @@
 					stockCount+=1;
 				}
 			});
-
 			$("#cent").on("change","input",function(){
 				var elm = $(this);
 				console.log(elm.attr("id"));
@@ -77,10 +109,72 @@
 				if(id.substring(0,5)==('quant')){
 					var i = parseInt(id.substring(5));
 					socket.emit('nowPrice',$('#tick'+i).val(),function(back){
+						stocksPrice[$('#tick'+i).val()]=parseFloat(back);
+						var val=parseFloat(back*parseFloat($('#quant'+i).val()));
+						values[i]=val;
 						$("#cost"+i).text(parseFloat(back).toFixed(2));
-						$("#value"+i).text((parseFloat(back)*parseFloat($('#quant'+i).val())).toFixed(2));
+						$("#value"+i).text(val.toFixed(2));
+						total = 0;
+						for(var n=0; n<values.length;n++){
+							total += values[n];
+						}
+						$("#cap").text("Total Value: "+(total.toFixed(2)));
 					});
 				}
+			});
+
+			function getColor(value){
+				if(value<0){
+					return "red";
+				}else if(value>0){
+					return "green";
+				}	
+				return "black";		
+			}
+
+			$("#calc").click(function(){
+				stocks={};
+				stocks['SPY']=0;
+				stocks['VTHR']=0;
+
+				for(var i=0; i<=stockCount; i++){
+					var ticker = $('#tick'+i).val();
+					if(ticker!=''){
+						var quant = parseFloat($('#quant'+i).val());
+						stocks[ticker]=quant;
+					}
+				}
+				socket.emit("correlation", stocks, function(back){
+					var keys = Object.keys(stocks);
+					var N = keys.length;
+					var l = '<table class="table"><thead><tr><th style="color:'+getColor(range)+';" scope="col">'+range+'% change in</th>';
+					for(var c =2;c<N;c++){
+						l+=' <th scope="col">'+keys[c]+'</th>';	
+					}
+					l+='<th scope="col">Total</th</tr></thead><tbody>';
+					var total = 0;
+					for(var n=0; n<values.length;n++){
+						total += values[n];
+					}
+					for(var r = 0; r<N; r++){
+						l+='<tr><th scope="row">'+keys[r]+'</th>';
+						var exposure=0;
+
+						for(var c =2;c<N;c++){
+							if(r==c){
+								l+='<td>-</td>';
+							}else{
+								
+								l+='<td style="color:'+getColor(range*back[r][c])+';">'+(parseFloat(range*back[r][c])).toFixed(2)+'%'+'</td>';
+							}
+							exposure += (parseFloat(back[r][c]))*stocks[keys[c]]*stocksPrice[keys[c]];
+
+						}
+						l+='<td style="color:'+getColor(range*exposure)+';">'+(range*exposure/total).toFixed(2)+'%</td></tr>';
+					}
+					l+= '</tbody></table>';
+					$("#buttDiv").after(l);
+				});
 			});
 		</script>
 	</body>
